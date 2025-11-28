@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from sense_hat import SenseHat
 
-# =========================
+# =======================
 # Config
 # =========================
 RATE_HZ   = 50.0
@@ -15,17 +15,18 @@ DT        = 1.0 / RATE_HZ
 DATA_ROOT = Path("/home/pi/Desktop/data")
 
 # Labels / IDs
-LABELS  = {"sitting": 0, "walking": 1, "running": 2}
+LABELS  = {"sitting": 0, "walking": 1, "running": 2, "falling": 3}
 IDLE_ID = -1
 
 # Joystick mapping (latched)
-DIR_TO_LABEL = {"up": "sitting", "right": "walking", "left": "running"}  # "down" = idle, "middle" = end
+DIR_TO_LABEL = {"up": "sitting", "right": "walking", "left": "running", "down": "falling"}  # "down" = idle, "middle" = end
 DEBOUNCE_S   = 0.15
 LETTER_FLASH_S = 0.08
 LABEL_DISPLAY = {
     "sitting": ("S", (255, 120, 120)),
     "walking": ("W", (120, 255, 120)),
     "running": ("R", (120, 120, 255)),
+    "falling": ("F", (255, 255, 255)),
 }
 
 # =========================
@@ -64,9 +65,9 @@ meta = {
     "rate_hz": RATE_HZ,
     "mount": "waist",
     "axes": "x=forward,y=left,z=up",
-    "labels": ["sitting", "walking", "running"],
+    "labels": ["sitting", "walking", "running", "falling"],
     "idle_id": IDLE_ID,
-    "ui": "UP=sitting, RIGHT=walking, LEFT=running, DOWN=idle, CENTER=end",
+    "ui": "UP=sitting, RIGHT=walking, LEFT=running, DOWN=falling, CENTER=end",
     "notes": "Accelerometer-only; LEDs off; joystick in separate thread; batched writes; 50Hz sampling",
 }
 
@@ -119,13 +120,13 @@ def joystick_worker():
                 print("Ending data capture...")
                 sense.clear()
                 break
-            if e.direction == "down":
-                set_label(IDLE_ID)
-                display_activity(None)
-                print("IDLE")
-                continue
+            # if e.direction == "down":
+            #     set_label(IDLE_ID)
+            #     display_activity(None)
+            #     print("IDLE")
+            #     continue
             if e.direction in DIR_TO_LABEL:
-                label_name = DIR_TO_LABEL[e.direction]  # 'sitting', 'walking', 'running'
+                label_name = DIR_TO_LABEL[e.direction]  # 'sitting', 'walking', 'running', 'falling'
                 set_label(LABELS[label_name])
                 display_activity(label_name)
                 print(label_name.upper())
