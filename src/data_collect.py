@@ -19,7 +19,7 @@ LABELS  = {"sitting": 0, "walking": 1, "running": 2, "falling": 3}
 IDLE_ID = -1
 
 # Joystick mapping (latched)
-DIR_TO_LABEL = {"up": "sitting", "right": "walking", "left": "running", "down": "falling"}  # "down" = idle, "middle" = end
+DIR_TO_LABEL = {"up": "sitting", "right": "walking", "left": "running", "down": "falling"}  # CENTER will toggle idle
 DEBOUNCE_S   = 0.15
 LETTER_FLASH_S = 0.08
 LABEL_DISPLAY = {
@@ -67,7 +67,7 @@ meta = {
     "axes": "x=forward,y=left,z=up",
     "labels": ["sitting", "walking", "running", "falling"],
     "idle_id": IDLE_ID,
-    "ui": "UP=sitting, RIGHT=walking, LEFT=running, DOWN=falling, CENTER=end",
+    "ui": "UP=sitting, RIGHT=walking, LEFT=running, DOWN=falling, CENTER=idle (press), Ctrl-C=end",
     "notes": "Accelerometer-only; LEDs off; joystick in separate thread; batched writes; 50Hz sampling",
 }
 
@@ -116,10 +116,11 @@ def joystick_worker():
             _last_press_t = nowp
 
             if e.direction == "middle":
-                stop_running()
-                print("Ending data capture...")
-                sense.clear()
-                break
+                # Map CENTER press to IDLE: stop labeling, clear LEDs
+                set_label(IDLE_ID)
+                display_activity(None)
+                print("IDLE")
+                continue
             # if e.direction == "down":
             #     set_label(IDLE_ID)
             #     display_activity(None)
@@ -136,6 +137,14 @@ def joystick_worker():
 def main():
     jt = threading.Thread(target=joystick_worker, daemon=True)
     jt.start()
+
+    # Startup banner: make console output explicit about what's being recorded
+    print(f"[START] Session dir: {session_dir}")
+    print(f"[START] Target rate: {RATE_HZ} Hz")
+    print(f"[START] Writing CSV: {csv_path}")
+    print("[START] Columns: t_epoch, ax_g, ay_g, az_g, label_id")
+    print(f"[START] Joystick: {meta['ui']}")
+    print("[HINT] Press a direction to set label; CENTER sets IDLE; Ctrl-C to stop\n")
 
     with open(csv_path, "w", buffering=1024*1024) as f:  # large OS buffer
         f.write("# " + json.dumps(meta) + "\n")
