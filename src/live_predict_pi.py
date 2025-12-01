@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """Live HAR prediction on Raspberry Pi using a saved model.
 
 Requirements:
@@ -56,6 +57,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--window-sec", type=float, default=None, help="Window seconds (defaults to model bundle)")
     p.add_argument("--stride-sec", type=float, default=None, help="Stride seconds between predictions (default: window_sec/2)")
     p.add_argument("--smooth", type=int, default=3, help="Majority vote over last N predictions (default: 3)")
+    p.add_argument("--rotate-deg", type=int, choices=[0, 90, 180, 270], default=0, help="Rotate LED letters (0/90/180/270). Use 180 for upside down.")
     return p.parse_args()
 
 
@@ -75,6 +77,11 @@ def main() -> None:
     sense = SenseHat()
     sense.clear()
     sense.set_imu_config(False, False, True)  # accelerometer only
+    # Rotate LED matrix so letters appear with desired orientation
+    try:
+        sense.set_rotation(int(args.rotate_deg))
+    except Exception:
+        pass
 
     buf: Deque[Tuple[float, float, float]] = deque(maxlen=window_samples)
     pred_hist: Deque[int] = deque(maxlen=max(1, int(args.smooth)))
@@ -117,4 +124,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

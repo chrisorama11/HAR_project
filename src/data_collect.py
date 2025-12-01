@@ -29,6 +29,10 @@ LABEL_DISPLAY = {
     "falling": ("F", (255, 255, 255)),
 }
 
+# Rotate LED matrix text if your device is mounted differently.
+# One of: 0, 90, 180, 270. Use 180 to show letters upside down.
+DISPLAY_ROTATION_DEG = 180
+
 # =========================
 # Sense HAT (perf-minded)
 # =========================
@@ -36,6 +40,12 @@ sense = SenseHat()
 sense.clear()  # turn off LEDs entirely during capture
 # Enable accelerometer only
 sense.set_imu_config(False, False, True)
+# Rotate LED matrix for letter orientation
+try:
+    sense.set_rotation(int(DISPLAY_ROTATION_DEG))
+except Exception:
+    # Older library versions may not support rotation; ignore gracefully
+    pass
 
 def _flash_letter(letter: str, color):
     """Clear, briefly flash, then hold the given letter."""
