@@ -11,8 +11,6 @@ This script windows the data, extracts features, trains SVM, prints accuracy, an
 from __future__ import annotations
 
 import argparse
-import json
-import sys
 from pathlib import Path
 from typing import List, Tuple
 
@@ -32,9 +30,8 @@ def _discover_csvs(root: Path) -> List[Path]:
 
 
 def _load_csv(csv_path: Path) -> pd.DataFrame:
-    # Use comment prefix to ignore the JSON header row.
-    df = pd.read_csv(csv_path, comment="#")
-    return df
+    # Ignore optional JSON header row prefixed with '#'.
+    return pd.read_csv(csv_path, comment="#")
 
 
 def build_dataset(data_dir: Path, window_sec: float = 2.0, rate_hz: float = 50.0) -> Tuple[pd.DataFrame, np.ndarray, List[str], float]:
@@ -66,11 +63,10 @@ def train_and_save_model(data_dir: Path, window_sec: float = 2.0, model_out: Pat
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    #scales data
-    scaler = StandardScaler() 
+    # scale features
+    scaler = StandardScaler()
     X_train_s = scaler.fit_transform(X_train)
     X_test_s = scaler.transform(X_test)
-
 
     clf = SVC(kernel="rbf", C=10.0, gamma="scale", class_weight="balanced")
     clf.fit(X_train_s, y_train)

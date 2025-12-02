@@ -8,15 +8,18 @@ Requirements:
 Usage:
   python src/live_predict_pi.py --model models/svm_4class.pkl [--window-sec 2.0] [--stride-sec 1.0]
 
-Displays predicted class on the Sense HAT LEDs (S/W/R/F) and prints to console.
+Displays predicted class on the Sense HAT LEDs (S/W/R/F), prints to console,
+and can broadcast JSON updates via UDP for dashboards.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import pickle
+import socket
 import time
-from collections import deque, Counter
+from collections import Counter, deque
 from typing import Deque, Dict, Tuple
 
 import numpy as np
@@ -58,7 +61,28 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--stride-sec", type=float, default=None, help="Stride seconds between predictions (default: window_sec/2)")
     p.add_argument("--smooth", type=int, default=3, help="Majority vote over last N predictions (default: 3)")
     p.add_argument("--rotate-deg", type=int, choices=[0, 90, 180, 270], default=0, help="Rotate LED letters (0/90/180/270). Use 180 for upside down.")
+    p.add_argument("--broadcast-udp", type=str, default=None, help="Send JSON prediction updates via UDP to host:port (e.g., 127.0.0.1:5050)")
     return p.parse_args()
+
+
+def _parse_host_port(value: str) -> Tuple[str, int]:
+    host, sep, port_str = value.rpartition(":")
+    if not sep:
+        raise ValueError("Expected host:port")
+    host = host or "127.0.0.1"
+    port = int(port_str)
+    if port <= 0 or port > 65535:
+        raise ValueError("Port out of range")
+    return host, port
+
+
+def _broadcast_prediction(sock: socket.socket | None, target: Tuple[str, int] | None, payload: dict) -> None:
+    if not sock or not target:
+        return
+    try:
+        sock.sendto(json.dumps(payload).encode("utf-8"), target)
+    except Exception:
+        pass
 
 
 def main() -> None:
@@ -73,6 +97,15 @@ def main() -> None:
 
     window_samples = max(1, int(round(window_sec * rate_hz)))
     stride_samples = max(1, int(round(stride_sec * rate_hz)))
+
+    udp_sock: socket.socket | None = None
+    udp_target: Tuple[str, int] | None = None
+    if args.broadcast_udp:
+        try:
+            udp_target = _parse_host_port(args.broadcast_udp)
+            udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        except ValueError as exc:
+            raise SystemExit(f"Invalid --broadcast-udp value: {exc}")
 
     sense = SenseHat()
     sense.clear()
@@ -113,12 +146,29 @@ def main() -> None:
                     _show_label(sense, mode)
                 print(f"pred={pred} smooth={mode}")
 
+                _broadcast_prediction(
+                    udp_sock,
+                    udp_target,
+                    {
+                        "timestamp": time.time(),
+                        "raw_label_id": int(pred),
+                        "raw_label_name": LABELS[pred] if 0 <= pred < len(LABELS) else str(pred),
+                        "smooth_label_id": int(mode),
+                        "smooth_label_name": LABELS[mode] if 0 <= mode < len(LABELS) else str(mode),
+                        "window_sec": window_sec,
+                        "stride_sec": stride_sec,
+                        "smooth_window": len(pred_hist),
+                    },
+                )
+
             # pace loop to ~rate_hz
             time.sleep(max(0.0, (1.0 / rate_hz)))
     except KeyboardInterrupt:
         pass
     finally:
         sense.clear()
+        if udp_sock is not None:
+            udp_sock.close()
         print("[DONE]")
 
 
